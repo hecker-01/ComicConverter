@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Comic Converter</string>
+    <string name="reading_cbz_file">Reading CBZ file...</string>
+    <string name="pdf_created_successfully">PDF created successfully!\n%1$s</string>
+    <string name="error">Error: %1$s</string>
+    <string name="processing">Processing %1$s...</string>
+    <string name="creating_pdf_with_pages">Creating PDF with %1$d pages...</string>
+    <string name="adding_page_of">Adding page %1$d of %2$d...</string>
+    <string name="reading_folder_contents">Reading folder contents...</string>
+    <string name="all_chapters_converted_successfully">All chapters converted successfully!\n%1$s</string>
+    <string name="scanning_folder">Scanning folder...</string>
+    <string name="found_chapters_processing">Found %1$d chapters. Processing...</string>
+    <string name="processing_chapter_of">Processing chapter %1$d of %2$d: %3$s</string>
+    <string name="cbz_to_pdf_converter">CBZ to PDF Converter</string>
+</resources>
