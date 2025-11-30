@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.documentfile.provider.DocumentFile
+import com.google.android.material.color.DynamicColors
 import com.itextpdf.io.image.ImageDataFactory
 import com.itextpdf.kernel.pdf.PdfDocument
 import com.itextpdf.kernel.pdf.PdfWriter
@@ -64,6 +65,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Apply Material You dynamic colors
+        DynamicColors.applyToActivityIfAvailable(this)
+        
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 

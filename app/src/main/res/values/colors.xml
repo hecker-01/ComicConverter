@@ -2,6 +2,6 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="ic_foreground">#8f4be3</color>
+    <color name="ic_foreground">#8E24AA</color>
     <color name="ic_background">#FFFFFF</color>
 </resources>
