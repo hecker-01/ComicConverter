@@ -18,7 +18,7 @@
             android:supportsRtl="true"
             android:theme="@style/Theme.ComicConverter">
         <activity
-                android:name=".MainActivity"
+                android:name="dev.heckr.comicconverter.MainActivity"
                 android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

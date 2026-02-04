@@ -6,7 +6,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:padding="16dp"
-        tools:context=".MainActivity">
+        tools:context="dev.heckr.comicconverter.MainActivity">
 
     <TextView
             android:id="@+id/titleText"
@@ -24,8 +24,9 @@
             android:id="@+id/selectFileButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Select CBZ File"
+            android:text="@string/select_cbz_file"
             android:layout_marginTop="32dp"
+            android:layout_marginHorizontal="16dp"
             app:layout_constraintTop_toBottomOf="@id/titleText"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
@@ -34,8 +35,9 @@
             android:id="@+id/selectFolderButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Select Comic Folder"
+            android:text="@string/select_comic_folder"
             android:layout_marginTop="16dp"
+            android:layout_marginHorizontal="16dp"
             app:layout_constraintTop_toBottomOf="@id/selectFileButton"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />

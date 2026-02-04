@@ -13,3 +13,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+/app/cordium-dev.keystore
+/app/cordium-release.keystore

@@ -1,4 +1,4 @@
-package net.heckerdev.comicconverter
+package dev.heckr.comicconverter
 
 import org.junit.Test
 

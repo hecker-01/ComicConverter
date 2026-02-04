@@ -4,24 +4,45 @@ plugins {
 }
 
 android {
-    namespace = "net.heckerdev.comicconverter"
+    namespace = "dev.heckr.comicconverter"
     compileSdk {
         version = release(36)
     }
 
     defaultConfig {
-        applicationId = "net.heckerdev.comicconverter"
+        applicationId = "dev.heckr.comicconverter"
         minSdk = 31
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("dev") {
+            storeFile = file("cordium-dev.keystore")
+            storePassword = "CordiumPassw"
+            keyAlias = "cordium"
+            keyPassword = "CordiumPassw"
+        }
+        create("release") {
+            storeFile = file("cordium-release.keystore")
+            storePassword = "CordiumPassw"
+            keyAlias = "cordium"
+            keyPassword = "CordiumPassw"
+        }
+    }
+
     buildTypes {
+        debug {
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            signingConfig = signingConfigs.getByName("dev")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -43,14 +64,8 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
-
-    // Document file provider for folder access
     implementation(libs.androidx.documentfile)
-
-    // PDF generation
     implementation(libs.itext7.core.v725)
-
-    // Coroutines for async operations
     implementation(libs.kotlinx.coroutines.android.v173)
 
     testImplementation(libs.junit)

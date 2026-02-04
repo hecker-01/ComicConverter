@@ -1,4 +1,4 @@
-package net.heckerdev.comicconverter
+package dev.heckr.comicconverter
 
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -24,6 +24,7 @@ import com.itextpdf.io.image.ImageDataFactory
 import com.itextpdf.kernel.pdf.PdfDocument
 import com.itextpdf.kernel.pdf.PdfWriter
 import com.itextpdf.layout.Document
+import com.itextpdf.layout.element.AreaBreak
 import com.itextpdf.layout.element.Image
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -249,7 +250,7 @@ class MainActivity : AppCompatActivity() {
                         )
 
                         if (index > 0) {
-                            document.add(com.itextpdf.layout.element.AreaBreak())
+                            document.add(AreaBreak())
                         }
 
                         document.add(image)
@@ -520,7 +521,7 @@ class MainActivity : AppCompatActivity() {
                         )
 
                         if (pageIndex > 0) {
-                            document.add(com.itextpdf.layout.element.AreaBreak())
+                            document.add(AreaBreak())
                         }
 
                         document.add(image)

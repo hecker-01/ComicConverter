@@ -2,6 +2,8 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="ic_foreground">#8E24AA</color>
-    <color name="ic_background">#FFFFFF</color>
+    <!-- Make the icon foreground follow the theme primary color -->
+    <color name="ic_foreground">?attr/colorPrimary</color>
+    <!-- Make the icon background follow the theme surface color (background-like) -->
+    <color name="ic_background">?attr/colorSurface</color>
 </resources>
