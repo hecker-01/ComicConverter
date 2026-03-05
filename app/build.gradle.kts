@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.kotlin.android)
 }
 
+val gitCommitCount = providers.exec {
+    commandLine("git", "rev-list", "--count", "HEAD")
+}.standardOutput.asText.get().trim().toInt()
+
 android {
     namespace = "dev.heckr.comicconverter"
     compileSdk {
@@ -13,8 +17,8 @@ android {
         applicationId = "dev.heckr.comicconverter"
         minSdk = 31
         targetSdk = 36
-        versionCode = 3
-        versionName = "2.1"
+        versionCode = gitCommitCount
+        versionName = "26.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -49,12 +53,27 @@ android {
             )
         }
     }
+
+    applicationVariants.all {
+        outputs.all {
+            val output = this as? com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            output?.outputFileName = when (buildType.name) {
+                "debug" -> "comicconverter-dev-${versionName.replace(Regex("-.*"), "").replace(".", "-")}.apk"
+                "release" -> "comicconverter-release-${versionName.replace(".", "-")}.apk"
+                else -> output?.outputFileName ?: ""
+            }
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
     kotlinOptions {
         jvmTarget = "11"
+    }
+    buildFeatures {
+        buildConfig = true
+        viewBinding = true
     }
 }
 

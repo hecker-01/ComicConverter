@@ -19,6 +19,6 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("net.heckerdev.comicconverter", appContext.packageName)
+        assertEquals("dev.heckr.comicconverter", appContext.packageName)
     }
 }
