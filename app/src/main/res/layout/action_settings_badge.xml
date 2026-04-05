@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="wrap_content" android:layout_height="wrap_content" android:clipChildren="false" android:clipToPadding="false" android:contentDescription="@string/settings" android:padding="8dp">
+
+    <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_settings" android:importantForAccessibility="no" />
+
+    <View android:id="@+id/badge_dot" android:layout_width="8dp" android:layout_height="8dp" android:layout_gravity="top|end" android:background="@drawable/badge_dot" android:visibility="gone" />
+
+</FrameLayout>

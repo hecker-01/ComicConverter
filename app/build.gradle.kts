@@ -17,7 +17,7 @@ android {
         minSdk = 31
         targetSdk = 36
         versionCode = gitCommitCount
-        versionName = "26.1.1"
+        versionName = "26.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -94,6 +94,7 @@ dependencies {
     implementation(libs.androidx.documentfile)
     implementation(libs.itext.core)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.markwon)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -8,6 +8,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.OpenableColumns
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.Button
 import android.widget.ProgressBar
@@ -19,6 +21,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.documentfile.provider.DocumentFile
+import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.color.DynamicColors
 import com.itextpdf.io.image.ImageDataFactory
 import com.itextpdf.kernel.pdf.PdfDocument
@@ -26,6 +29,7 @@ import com.itextpdf.kernel.pdf.PdfWriter
 import com.itextpdf.layout.Document
 import com.itextpdf.layout.element.AreaBreak
 import com.itextpdf.layout.element.Image
+import dev.heckr.comicconverter.updater.UpdateChecker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -34,6 +38,7 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.OutputStream
 import java.util.zip.ZipInputStream
 
 class MainActivity : AppCompatActivity() {
@@ -41,6 +46,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var selectFolderButton: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var statusText: TextView
+    private var badgeDot: View? = null
 
     private val REQUEST_PERMISSION_CODE = 100
 
@@ -73,6 +79,9 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 
+        val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+
         selectFileButton = findViewById(R.id.selectFileButton)
         selectFolderButton = findViewById(R.id.selectFolderButton)
         progressBar = findViewById(R.id.progressBar)
@@ -90,6 +99,45 @@ class MainActivity : AppCompatActivity() {
 
         selectFolderButton.setOnClickListener {
             openFolderPicker()
+        }
+
+        UpdateChecker.check(this)
+        UpdateChecker.addListener(updateBadgeListener)
+    }
+
+    override fun onDestroy() {
+        UpdateChecker.removeListener(updateBadgeListener)
+        super.onDestroy()
+    }
+
+    private val updateBadgeListener: () -> Unit = {
+        badgeDot?.visibility = if (UpdateChecker.updateAvailable) View.VISIBLE else View.GONE
+    }
+
+    override fun onResume() {
+        super.onResume()
+        badgeDot?.visibility = if (UpdateChecker.updateAvailable) View.VISIBLE else View.GONE
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_main, menu)
+        val settingsItem = menu.findItem(R.id.action_settings)
+        val actionView = settingsItem.actionView
+        actionView?.let {
+            badgeDot = it.findViewById(R.id.badge_dot)
+            badgeDot?.visibility = if (UpdateChecker.updateAvailable) View.VISIBLE else View.GONE
+            it.setOnClickListener { onOptionsItemSelected(settingsItem) }
+        }
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_settings -> {
+                startActivity(Intent(this, SettingsActivity::class.java))
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
     }
 
@@ -195,16 +243,9 @@ class MainActivity : AppCompatActivity() {
 
         statusText.post { statusText.text = getString(R.string.creating_pdf_with_pages, images.size) }
 
-        // Create PDF in public Documents directory
-        val outputDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "ComicConverter")
+        val (pdfStream, displayPath) = getOutputStreamForPdf(title)
 
-        if (!outputDir.exists()) {
-            outputDir.mkdirs()
-        }
-
-        val pdfFile = File(outputDir, "${title}.pdf")
-
-        PdfWriter(FileOutputStream(pdfFile)).use { writer ->
+        PdfWriter(pdfStream).use { writer ->
             PdfDocument(writer).use { pdfDoc ->
                 // Set PDF metadata
                 val info = pdfDoc.documentInfo
@@ -260,7 +301,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        "PDF saved to: ${pdfFile.absolutePath}"
+        "PDF saved to: $displayPath"
     }
 
     private fun getFileName(uri: Uri): String {
@@ -322,16 +363,6 @@ class MainActivity : AppCompatActivity() {
         // Get folder name
         val folderName = getFolderName(uri)
 
-        // Create output directory
-        val outputDir = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
-            "ComicConverter/$folderName"
-        )
-
-        if (!outputDir.exists()) {
-            outputDir.mkdirs()
-        }
-
         // Find all CBZ files, metadata, and cover image
         val documentFile = DocumentFile.fromTreeUri(this@MainActivity, uri)
             ?: throw Exception("Cannot access folder")
@@ -385,10 +416,10 @@ class MainActivity : AppCompatActivity() {
                 )
             }
 
-            processChapterCbz(cbzFile, outputDir, metadata, coverImageData)
+            processChapterCbz(cbzFile, folderName, metadata, coverImageData)
         }
 
-        "Saved ${cbzFiles.size} chapters to: ${outputDir.absolutePath}"
+        "Saved ${cbzFiles.size} chapters to: ${AppSettings.getDisplayPath(this@MainActivity)}"
     }
 
     private fun getFolderName(uri: Uri): String {
@@ -396,9 +427,35 @@ class MainActivity : AppCompatActivity() {
         return documentFile?.name ?: "Comic"
     }
 
+    private fun getOutputStreamForPdf(title: String, subfolder: String? = null): Pair<OutputStream, String> {
+        val outputUri = AppSettings.getOutputFolderUri(this)
+        return if (outputUri != null) {
+            val root = DocumentFile.fromTreeUri(this, outputUri)
+                ?: throw Exception(getString(R.string.output_folder_inaccessible))
+            val dir = if (subfolder != null) {
+                root.findFile(subfolder) ?: root.createDirectory(subfolder)
+                    ?: throw Exception(getString(R.string.output_folder_inaccessible))
+            } else root
+            dir.findFile("$title.pdf")?.delete()
+            val docFile = dir.createFile("application/pdf", "$title.pdf")
+                ?: throw Exception(getString(R.string.output_folder_inaccessible))
+            val stream = contentResolver.openOutputStream(docFile.uri)
+                ?: throw Exception(getString(R.string.output_folder_inaccessible))
+            val rootName = root.name ?: outputUri.lastPathSegment ?: ""
+            val displayPath = if (subfolder != null) "$rootName/$subfolder/$title.pdf" else "$rootName/$title.pdf"
+            stream to displayPath
+        } else {
+            val base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+            val dir = if (subfolder != null) File(base, "ComicConverter/$subfolder") else File(base, "ComicConverter")
+            if (!dir.exists()) dir.mkdirs()
+            val pdfFile = File(dir, "$title.pdf")
+            FileOutputStream(pdfFile) to pdfFile.absolutePath
+        }
+    }
+
     private suspend fun processChapterCbz(
         cbzFile: DocumentFile,
-        outputDir: File,
+        subfolder: String?,
         comicMetadata: JSONObject?,
         coverImageData: ByteArray?
     ) = withContext(Dispatchers.IO) {
@@ -443,9 +500,9 @@ class MainActivity : AppCompatActivity() {
             ?: fileName.replace(".cbz", "")
 
         // Create PDF
-        val pdfFile = File(outputDir, "${chapterTitle}.pdf")
+        val (pdfStream, _) = getOutputStreamForPdf(chapterTitle, subfolder)
 
-        PdfWriter(FileOutputStream(pdfFile)).use { writer ->
+        PdfWriter(pdfStream).use { writer ->
             PdfDocument(writer).use { pdfDoc ->
                 // Set PDF metadata
                 val info = pdfDoc.documentInfo
