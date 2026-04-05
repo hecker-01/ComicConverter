@@ -8,6 +8,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.OpenableColumns
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.Button
 import android.widget.ProgressBar
@@ -19,6 +21,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.documentfile.provider.DocumentFile
+import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.color.DynamicColors
 import com.itextpdf.io.image.ImageDataFactory
 import com.itextpdf.kernel.pdf.PdfDocument
@@ -26,6 +29,7 @@ import com.itextpdf.kernel.pdf.PdfWriter
 import com.itextpdf.layout.Document
 import com.itextpdf.layout.element.AreaBreak
 import com.itextpdf.layout.element.Image
+import dev.heckr.comicconverter.updater.UpdateChecker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -41,6 +45,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var selectFolderButton: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var statusText: TextView
+    private var badgeDot: View? = null
 
     private val REQUEST_PERMISSION_CODE = 100
 
@@ -73,6 +78,9 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 
+        val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+
         selectFileButton = findViewById(R.id.selectFileButton)
         selectFolderButton = findViewById(R.id.selectFolderButton)
         progressBar = findViewById(R.id.progressBar)
@@ -90,6 +98,45 @@ class MainActivity : AppCompatActivity() {
 
         selectFolderButton.setOnClickListener {
             openFolderPicker()
+        }
+
+        UpdateChecker.check(this)
+        UpdateChecker.addListener(updateBadgeListener)
+    }
+
+    override fun onDestroy() {
+        UpdateChecker.removeListener(updateBadgeListener)
+        super.onDestroy()
+    }
+
+    private val updateBadgeListener: () -> Unit = {
+        badgeDot?.visibility = if (UpdateChecker.updateAvailable) View.VISIBLE else View.GONE
+    }
+
+    override fun onResume() {
+        super.onResume()
+        badgeDot?.visibility = if (UpdateChecker.updateAvailable) View.VISIBLE else View.GONE
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_main, menu)
+        val settingsItem = menu.findItem(R.id.action_settings)
+        val actionView = settingsItem.actionView
+        actionView?.let {
+            badgeDot = it.findViewById(R.id.badge_dot)
+            badgeDot?.visibility = if (UpdateChecker.updateAvailable) View.VISIBLE else View.GONE
+            it.setOnClickListener { onOptionsItemSelected(settingsItem) }
+        }
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_settings -> {
+                startActivity(Intent(this, SettingsActivity::class.java))
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
     }
 
