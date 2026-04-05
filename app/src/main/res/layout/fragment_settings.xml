@@ -4,8 +4,23 @@
 
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
 
+        <!-- Output Folder Card -->
+        <com.google.android.material.card.MaterialCardView android:id="@+id/output_folder_card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" app:cardCornerRadius="12dp" style="?attr/materialCardViewOutlinedStyle">
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/output_folder" android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                <TextView android:id="@+id/output_folder_subtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textAppearance="?attr/textAppearanceBodySmall" android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <TextView android:id="@+id/reset_output_folder" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="@string/output_folder_reset" android:textAppearance="?attr/textAppearanceBodySmall" android:textColor="?attr/colorPrimary" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:visibility="gone" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Update Card -->
-        <com.google.android.material.card.MaterialCardView android:id="@+id/update_card" android:layout_width="match_parent" android:layout_height="wrap_content" app:cardCornerRadius="12dp" style="?attr/materialCardViewOutlinedStyle">
+        <com.google.android.material.card.MaterialCardView android:id="@+id/update_card" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" app:cardCornerRadius="12dp" style="?attr/materialCardViewOutlinedStyle">
 
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
 

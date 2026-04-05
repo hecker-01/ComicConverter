@@ -11,7 +11,6 @@
     <string name="scanning_folder">Scanning folder…</string>
     <string name="found_chapters_processing">Found %1$d chapters. Processing…</string>
     <string name="processing_chapter_of">Processing chapter %1$d of %2$d: %3$s</string>
-    <string name="cbz_to_pdf_converter">CBZ to PDF Converter</string>
     <string name="select_cbz_file">Select CBZ File</string>
     <string name="select_comic_folder">Select Comic Folder</string>
 
@@ -45,4 +44,10 @@
     <string name="update_button">Update</string>
     <string name="cancel_button">Cancel</string>
     <string name="no_changelog">No changelog available.</string>
+
+    <!-- Output folder -->
+    <string name="output_folder">Output Folder</string>
+    <string name="output_folder_default">Documents/ComicConverter (default)</string>
+    <string name="output_folder_reset">Reset to default</string>
+    <string name="output_folder_inaccessible">Output folder is inaccessible</string>
 </resources>

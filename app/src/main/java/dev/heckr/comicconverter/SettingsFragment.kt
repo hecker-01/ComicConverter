@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -19,6 +20,20 @@ class SettingsFragment : Fragment() {
     private var _binding: FragmentSettingsBinding? = null
     private val binding get() = _binding!!
     private lateinit var appUpdater: AppUpdater
+
+    private val outputFolderPicker = registerForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            requireContext().contentResolver.takePersistableUriPermission(
+                uri,
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            AppSettings.setOutputFolderUri(requireContext(), uri)
+            updateOutputFolderDisplay()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,6 +92,16 @@ class SettingsFragment : Fragment() {
             }
         }
 
+        // Output folder card
+        binding.outputFolderCard.setOnClickListener {
+            outputFolderPicker.launch(AppSettings.getOutputFolderUri(requireContext()))
+        }
+        binding.resetOutputFolder.setOnClickListener {
+            AppSettings.clearOutputFolderUri(requireContext())
+            updateOutputFolderDisplay()
+        }
+        updateOutputFolderDisplay()
+
         // Version info
         binding.versionInfo.text = getString(
             R.string.version_format,
@@ -114,6 +139,13 @@ class SettingsFragment : Fragment() {
             }
             .setNegativeButton(R.string.cancel_button, null)
             .show()
+    }
+
+    private fun updateOutputFolderDisplay() {
+        if (_binding == null) return
+        val ctx = context ?: return
+        binding.outputFolderSubtitle.text = AppSettings.getDisplayPath(ctx)
+        binding.resetOutputFolder.isVisible = AppSettings.getOutputFolderUri(ctx) != null
     }
 
     override fun onDestroyView() {
