@@ -94,6 +94,7 @@ dependencies {
     implementation(libs.androidx.documentfile)
     implementation(libs.itext.core)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.markwon)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
