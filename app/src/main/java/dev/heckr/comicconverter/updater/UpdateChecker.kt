@@ -21,6 +21,8 @@ object UpdateChecker {
         private set
     var updateAvailable: Boolean = false
         private set
+    var lastCheckError: String? = null
+        private set
 
     private var listeners = mutableListOf<() -> Unit>()
     private var checking = false
@@ -47,7 +49,9 @@ object UpdateChecker {
                 conn.connectTimeout = 10_000
                 conn.readTimeout = 10_000
 
-                if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+                val responseCode = conn.responseCode
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    lastCheckError = null
                     val json = JSONObject(conn.inputStream.bufferedReader().readText())
                     val tagVersion = json.getString("tag_name").removePrefix("v")
 
@@ -71,9 +75,13 @@ object UpdateChecker {
                             updateAvailable = true
                         }
                     }
+                } else {
+                    lastCheckError = "Server returned HTTP $responseCode"
                 }
                 conn.disconnect()
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                lastCheckError = e.localizedMessage ?: "Unknown error"
+            }
 
             checking = false
             withContext(Dispatchers.Main) { listeners.forEach { it() } }
@@ -86,6 +94,7 @@ object UpdateChecker {
         latestApkUrl = null
         releaseBody = null
         apkSizeBytes = 0L
+        lastCheckError = null
     }
 
     private fun isNewerVersion(current: String, latest: String): Boolean {

@@ -28,6 +28,7 @@
     <string name="update_info_missing">Update info missing, cannot download.</string>
     <string name="checking_for_updates_status">Checking for updates...</string>
     <string name="up_to_date">You\'re on the latest version</string>
+    <string name="update_check_failed_format">Couldn\'t check for updates: %s</string>
     <string name="ptdl_update_title">App Update</string>
     <string name="downloading_version_format">Downloading version %s</string>
     <string name="download_setup_failed_format">Download setup failed: %s</string>

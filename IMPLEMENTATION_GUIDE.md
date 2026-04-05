@@ -201,6 +201,8 @@ object UpdateChecker {
         private set
     var updateAvailable: Boolean = false
         private set
+    var lastCheckError: String? = null   // Non-null when the check failed
+        private set
 
     // ── Listeners ───────────────────────────────────────────────────
     private var listeners = mutableListOf<() -> Unit>()
@@ -232,7 +234,9 @@ object UpdateChecker {
                 conn.connectTimeout = 10_000
                 conn.readTimeout = 10_000
 
-                if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+                val responseCode = conn.responseCode
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    lastCheckError = null
                     val json = JSONObject(conn.inputStream.bufferedReader().readText())
                     val tagVersion = json.getString("tag_name").removePrefix("v")
 
@@ -256,9 +260,13 @@ object UpdateChecker {
                             updateAvailable = true
                         }
                     }
+                } else {
+                    lastCheckError = "Server returned HTTP $responseCode"
                 }
                 conn.disconnect()
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                lastCheckError = e.localizedMessage ?: "Unknown error"
+            }
 
             checking = false
             withContext(Dispatchers.Main) { listeners.forEach { it() } }
@@ -271,6 +279,7 @@ object UpdateChecker {
         latestApkUrl = null
         releaseBody = null
         apkSizeBytes = 0L
+        lastCheckError = null
     }
 
     // ── Semver comparison ───────────────────────────────────────────
@@ -313,6 +322,7 @@ segment 1: 2 < 3     → return true (newer)
 - If a check is already in-flight (`checking == true`), `check()` returns immediately
 - If an update was already found (`updateAvailable == true`), `check()` returns immediately — no redundant API calls
 - All listeners are called on the **main thread** via `withContext(Dispatchers.Main)`, so UI updates are safe
+- **Error surfacing:** If the API returns a non-200 status code or the request throws an exception (e.g. no network), `lastCheckError` is set with a user-friendly description. The UI layer reads this field and displays the error in the update card subtitle (e.g. "Couldn't check for updates: Server returned HTTP 403"). On a successful 200 response, `lastCheckError` is cleared to `null`.
 
 ---
 
@@ -399,6 +409,12 @@ class AppUpdater(private val fragment: Fragment) {
                 R.string.update_available_format,
                 UpdateChecker.latestVersion
             ))
+        } else if (UpdateChecker.lastCheckError != null) {
+            state = State.IDLE
+            notify(fragment.requireContext().getString(
+                R.string.update_check_failed_format,
+                UpdateChecker.lastCheckError
+            ))
         }
     }
 
@@ -453,6 +469,12 @@ class AppUpdater(private val fragment: Fragment) {
             notify(fragment.requireContext().getString(
                 R.string.update_available_format,
                 UpdateChecker.latestVersion
+            ))
+        } else if (UpdateChecker.lastCheckError != null) {
+            state = State.IDLE
+            notify(fragment.requireContext().getString(
+                R.string.update_check_failed_format,
+                UpdateChecker.lastCheckError
             ))
         } else {
             state = State.IDLE
@@ -988,7 +1010,7 @@ override fun onCreate(savedInstanceState: Bundle?) {
 }
 ```
 
-This fires a single background coroutine. The API call has a 10-second timeout. If it fails (no network, rate-limited, etc.), it silently catches the exception and notifies listeners with `updateAvailable = false`. The user sees nothing.
+This fires a single background coroutine. The API call has a 10-second timeout. If it fails (no network, rate-limited, etc.), `UpdateChecker.lastCheckError` is set with a description of what went wrong, and listeners are notified. The update card subtitle will display the error (e.g. "Couldn't check for updates: Server returned HTTP 403"), so the user knows the check failed.
 
 ### GitHub API rate limits
 
@@ -1012,6 +1034,7 @@ Add these to your `res/values/strings.xml`:
 <string name="update_info_missing">Update info missing, cannot download.</string>
 <string name="checking_for_updates_status">Checking for updates…</string>
 <string name="up_to_date">You\'re on the latest version</string>
+<string name="update_check_failed_format">Couldn\'t check for updates: %s</string>
 <string name="ptdl_update_title">App Update</string>
 <string name="downloading_version_format">Downloading version %s</string>
 <string name="download_setup_failed_format">Download setup failed: %s</string>
@@ -1106,6 +1129,8 @@ The API endpoint `GET /repos/{owner}/{repo}/releases/latest` returns JSON like t
   App start         │                                  │
   ────────────────► │             IDLE                 │
                     │  "Tap to check for new versions" │
+                    │  (or error: "Couldn't check..." │
+                    │   if last check failed)          │
                     └──────────┬───────────────────────┘
                                │ user taps card
                                │ UpdateChecker.check()
@@ -1153,7 +1178,7 @@ The API endpoint `GET /repos/{owner}/{repo}/releases/latest` returns JSON like t
 
 ### Using a different release source (not GitHub)
 
-Replace the `UpdateChecker.check()` coroutine body with your own API call. As long as you set these five fields, everything else works unchanged:
+Replace the `UpdateChecker.check()` coroutine body with your own API call. As long as you set these fields, everything else works unchanged:
 
 ```kotlin
 latestVersion = "1.3.0"
@@ -1161,6 +1186,7 @@ latestApkUrl = "https://your-server.com/app-1.3.0.apk"
 releaseBody = "## Changelog\n- ..."
 apkSizeBytes = 15938048L
 updateAvailable = true
+lastCheckError = null  // clear any previous error
 ```
 
 ### Using a different Markdown renderer
@@ -1247,8 +1273,16 @@ binding.updateCard.setOnClickListener {
 ### GitHub API returns 403 (rate limited)
 
 - Unauthenticated limit is 60 requests/hour per IP
-- The code silently catches this and reports no update available
+- The update card subtitle will show "Couldn't check for updates: Server returned HTTP 403" so the user knows the check failed
+- The user can tap the card again to retry
 - If testing frequently, wait or add a GitHub token header
+
+### Update check shows an error message
+
+- This means the GitHub API call failed — either the device has no internet, the server returned a non-200 status, or the request timed out
+- The error is displayed in the update card subtitle (e.g. "Couldn't check for updates: Unable to resolve host...")
+- Tapping the card will retry the check
+- The error clears automatically on the next successful check
 
 ### Lambda label compile error
 

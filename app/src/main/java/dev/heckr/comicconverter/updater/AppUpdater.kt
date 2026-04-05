@@ -63,6 +63,12 @@ class AppUpdater(private val fragment: Fragment) {
                 R.string.update_available_format,
                 UpdateChecker.latestVersion
             ))
+        } else if (UpdateChecker.lastCheckError != null) {
+            state = State.IDLE
+            notify(fragment.requireContext().getString(
+                R.string.update_check_failed_format,
+                UpdateChecker.lastCheckError
+            ))
         }
     }
 
@@ -107,6 +113,12 @@ class AppUpdater(private val fragment: Fragment) {
             notify(fragment.requireContext().getString(
                 R.string.update_available_format,
                 UpdateChecker.latestVersion
+            ))
+        } else if (UpdateChecker.lastCheckError != null) {
+            state = State.IDLE
+            notify(fragment.requireContext().getString(
+                R.string.update_check_failed_format,
+                UpdateChecker.lastCheckError
             ))
         } else {
             state = State.IDLE
