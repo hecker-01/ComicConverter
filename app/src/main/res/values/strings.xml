@@ -51,4 +51,7 @@
     <string name="output_folder_default">Documents/ComicConverter (default)</string>
     <string name="output_folder_reset">Reset to default</string>
     <string name="output_folder_inaccessible">Output folder is inaccessible</string>
+
+    <!-- Footer -->
+    <string name="copyright_footer">© ComicConverter, by heckr.dev</string>
 </resources>

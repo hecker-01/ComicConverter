@@ -29,4 +29,3 @@ markwon = { module = "io.noties.markwon:core", version.ref = "markwon" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-

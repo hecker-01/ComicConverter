@@ -1,7 +1,13 @@
 package dev.heckr.comicconverter
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.Spanned
 import android.text.format.Formatter
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -108,6 +114,18 @@ class SettingsFragment : Fragment() {
             BuildConfig.VERSION_NAME,
             BuildConfig.VERSION_CODE
         )
+
+        // Footer with clickable link
+        val footerText = getString(R.string.copyright_footer)
+        val linkStart = footerText.indexOf("heckr.dev")
+        val spannable = SpannableString(footerText)
+        spannable.setSpan(object : ClickableSpan() {
+            override fun onClick(widget: View) {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://heckr.dev")))
+            }
+        }, linkStart, linkStart + "heckr.dev".length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        binding.copyrightFooter.text = spannable
+        binding.copyrightFooter.movementMethod = LinkMovementMethod.getInstance()
     }
 
     private fun showUpdateDialog() {

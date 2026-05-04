@@ -159,7 +159,7 @@ class AppUpdater(private val fragment: Fragment) {
 
             // Delete existing file if present
             val existingFile = File(
-                context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
                 fileName
             )
             if (existingFile.exists()) existingFile.delete()
@@ -192,8 +192,8 @@ class AppUpdater(private val fragment: Fragment) {
                 .setNotificationVisibility(
                     DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
                 )
-                .setDestinationInExternalFilesDir(
-                    context, Environment.DIRECTORY_DOWNLOADS, fileName
+                .setDestinationInExternalPublicDir(
+                    Environment.DIRECTORY_DOWNLOADS, fileName
                 )
                 .setAllowedOverMetered(true)
                 .setAllowedOverRoaming(true)
@@ -309,7 +309,7 @@ class AppUpdater(private val fragment: Fragment) {
             }
 
             val file = File(
-                context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
                 fileName
             )
             if (!file.exists()) return

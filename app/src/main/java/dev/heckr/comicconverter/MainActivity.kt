@@ -72,10 +72,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Apply Material You dynamic colors
         DynamicColors.applyToActivityIfAvailable(this)
-        
+
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 

@@ -17,7 +17,8 @@ An Android app that converts CBZ (Comic Book ZIP) files to PDF format.
 ## CBZ File Format
 
 The app expects CBZ files with the following structure:
-```
+
+```txt
 comic.cbz (ZIP file)
 ├── index.json (optional metadata)
 ├── page001.jpg
@@ -38,6 +39,7 @@ comic.cbz (ZIP file)
 ```
 
 All fields are optional. If not provided:
+
 - `title` defaults to the CBZ filename
 - `cover` defaults to the first image in alphabetical order
 
@@ -73,4 +75,3 @@ All fields are optional. If not provided:
 ```bash
 ./gradlew installDebug
 ```
-
