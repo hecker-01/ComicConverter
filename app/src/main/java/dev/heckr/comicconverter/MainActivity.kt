@@ -2,12 +2,8 @@ package dev.heckr.comicconverter
 
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
-import android.provider.OpenableColumns
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -20,42 +16,37 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.documentfile.provider.DocumentFile
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import com.google.android.material.color.DynamicColors
-import com.itextpdf.io.image.ImageDataFactory
-import com.itextpdf.kernel.pdf.PdfDocument
-import com.itextpdf.kernel.pdf.PdfWriter
-import com.itextpdf.layout.Document
-import com.itextpdf.layout.element.AreaBreak
-import com.itextpdf.layout.element.Image
+import dev.heckr.comicconverter.converter.*
 import dev.heckr.comicconverter.updater.UpdateChecker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.FileOutputStream
-import java.io.OutputStream
-import java.util.zip.ZipInputStream
 
 class MainActivity : AppCompatActivity() {
+
     private lateinit var selectFileButton: Button
     private lateinit var selectFolderButton: Button
+    private lateinit var detectionCard: MaterialCardView
+    private lateinit var detectedLabel: TextView
+    private lateinit var outputChipGroup: ChipGroup
     private lateinit var progressBar: ProgressBar
     private lateinit var statusText: TextView
     private var badgeDot: View? = null
 
-    private val REQUEST_PERMISSION_CODE = 100
+    private var detectedInput: DetectedInput? = null
 
     private val filePickerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
             result.data?.data?.let { uri ->
-                convertCbzToPdf(uri)
+                handleFileSelected(uri)
             }
         }
     }
@@ -65,17 +56,14 @@ class MainActivity : AppCompatActivity() {
     ) { result ->
         if (result.resultCode == RESULT_OK) {
             result.data?.data?.let { uri ->
-                convertFolderToPdf(uri)
+                handleFolderSelected(uri)
             }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Apply Material You dynamic colors
         DynamicColors.applyToActivityIfAvailable(this)
-
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 
@@ -84,6 +72,9 @@ class MainActivity : AppCompatActivity() {
 
         selectFileButton = findViewById(R.id.selectFileButton)
         selectFolderButton = findViewById(R.id.selectFolderButton)
+        detectionCard = findViewById(R.id.detectionCard)
+        detectedLabel = findViewById(R.id.detectedLabel)
+        outputChipGroup = findViewById(R.id.outputChipGroup)
         progressBar = findViewById(R.id.progressBar)
         statusText = findViewById(R.id.statusText)
 
@@ -93,13 +84,8 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        selectFileButton.setOnClickListener {
-            checkPermissionsAndOpenFilePicker()
-        }
-
-        selectFolderButton.setOnClickListener {
-            openFolderPicker()
-        }
+        selectFileButton.setOnClickListener { openFilePicker() }
+        selectFolderButton.setOnClickListener { openFolderPicker() }
 
         UpdateChecker.check(this)
         UpdateChecker.addListener(updateBadgeListener)
@@ -122,8 +108,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
         val settingsItem = menu.findItem(R.id.action_settings)
-        val actionView = settingsItem.actionView
-        actionView?.let {
+        settingsItem.actionView?.let {
             badgeDot = it.findViewById(R.id.badge_dot)
             badgeDot?.visibility = if (UpdateChecker.updateAvailable) View.VISIBLE else View.GONE
             it.setOnClickListener { onOptionsItemSelected(settingsItem) }
@@ -131,462 +116,130 @@ class MainActivity : AppCompatActivity() {
         return true
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_settings -> {
-                startActivity(Intent(this, SettingsActivity::class.java))
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
+    override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
+        R.id.action_settings -> {
+            startActivity(Intent(this, SettingsActivity::class.java))
+            true
+        }
+        else -> super.onOptionsItemSelected(item)
+    }
+
+    // region Input selection
+
+    private fun openFilePicker() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(
+                Intent.EXTRA_MIME_TYPES, arrayOf(
+                    "application/zip",
+                    "application/x-cbz",
+                    "application/x-rar-compressed",
+                    "application/vnd.rar",
+                    "application/pdf",
+                    "application/epub+zip"
+                )
+            )
+        }
+        filePickerLauncher.launch(intent)
+    }
+
+    private fun openFolderPicker() {
+        folderPickerLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
+    }
+
+    private fun handleFileSelected(uri: Uri) {
+        try {
+            val input = FormatDetector.detectFile(this, uri)
+            showDetectionCard(input)
+        } catch (e: Exception) {
+            statusText.text = getString(R.string.error, e.message)
         }
     }
 
-    private fun checkPermissionsAndOpenFilePicker() {
-        // Android 11+ (API 31 is minSdk) uses scoped storage, no permissions needed for file picker
-        openFilePicker()
+    private fun handleFolderSelected(uri: Uri) {
+        try {
+            val input = FormatDetector.detectFolder(this, uri)
+            showDetectionCard(input)
+        } catch (e: Exception) {
+            statusText.text = getString(R.string.error, e.message)
+        }
     }
 
+    // endregion
+
+    // region Detection card
+
+    private fun showDetectionCard(input: DetectedInput) {
+        detectedInput = input
+        detectedLabel.text = input.displayLabel
+        outputChipGroup.removeAllViews()
+
+        input.format.availableOutputFormats().forEach { fmt ->
+            val chip = Chip(this).apply {
+                text = fmt.displayName
+                isCheckable = false
+                setOnClickListener { startConversion(input, fmt) }
+            }
+            outputChipGroup.addView(chip)
+        }
+
+        detectionCard.visibility = View.VISIBLE
+        statusText.text = getString(R.string.choose_output_format)
+    }
+
+    // endregion
+
+    // region Conversion
+
+    private fun startConversion(input: DetectedInput, outputFormat: OutputFormat) {
+        CoroutineScope(Dispatchers.Main).launch {
+            setUiBusy(true)
+            progressBar.progress = 0
+            progressBar.visibility = View.VISIBLE
+            detectionCard.visibility = View.GONE
+
+            try {
+                val result = ConversionEngine.convert(this@MainActivity, input, outputFormat) { status, percent ->
+                    withContext(Dispatchers.Main) {
+                        statusText.text = status
+                        progressBar.progress = percent
+                    }
+                }
+                progressBar.visibility = View.GONE
+                statusText.text = getString(R.string.conversion_complete, result)
+                Toast.makeText(this@MainActivity, getString(R.string.done), Toast.LENGTH_LONG).show()
+                detectionCard.visibility = View.VISIBLE
+            } catch (e: Exception) {
+                progressBar.visibility = View.GONE
+                statusText.text = getString(R.string.error, e.message)
+                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                detectionCard.visibility = View.VISIBLE
+                e.printStackTrace()
+            } finally {
+                setUiBusy(false)
+            }
+        }
+    }
+
+    private fun setUiBusy(busy: Boolean) {
+        selectFileButton.isEnabled = !busy
+        selectFolderButton.isEnabled = !busy
+        outputChipGroup.children().forEach { it.isEnabled = !busy }
+    }
+
+    // ChipGroup doesn't expose children directly
+    private fun ChipGroup.children(): List<View> =
+        (0 until childCount).map { getChildAt(it) }
+
+    // endregion
+
+    // Unused but required override
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_PERMISSION_CODE) {
-            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                openFilePicker()
-            } else {
-                Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    private fun openFilePicker() {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "application/zip"
-            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/x-cbz"))
-        }
-        filePickerLauncher.launch(intent)
-    }
-
-    private fun convertCbzToPdf(uri: Uri) {
-        CoroutineScope(Dispatchers.Main).launch {
-            try {
-                selectFileButton.isEnabled = false
-                selectFolderButton.isEnabled = false
-                progressBar.progress = 0
-                progressBar.visibility = View.VISIBLE
-                statusText.text = getString(R.string.reading_cbz_file)
-
-                val result = withContext(Dispatchers.IO) {
-                    processCbzFile(uri)
-                }
-
-                progressBar.visibility = View.GONE
-                statusText.text = getString(R.string.pdf_created_successfully, result)
-                Toast.makeText(this@MainActivity, "Conversion complete!", Toast.LENGTH_LONG).show()
-
-            } catch (e: Exception) {
-                progressBar.visibility = View.GONE
-                statusText.text = getString(R.string.error, e.message)
-                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                e.printStackTrace()
-            } finally {
-                selectFileButton.isEnabled = true
-                selectFolderButton.isEnabled = true
-            }
-        }
-    }
-
-    private suspend fun processCbzFile(uri: Uri): String = withContext(Dispatchers.IO) {
-        val fileName = getFileName(uri)
-        statusText.post { statusText.text = getString(R.string.processing, fileName) }
-
-        val images = mutableListOf<Pair<String, ByteArray>>()
-        var metadata: JSONObject? = null
-
-        // Extract CBZ contents
-        contentResolver.openInputStream(uri)?.use { inputStream ->
-            ZipInputStream(inputStream).use { zipInputStream ->
-                var entry = zipInputStream.nextEntry
-
-                while (entry != null) {
-                    val entryName = entry.name
-
-                    when {
-                        entryName.equals("index.json", ignoreCase = true) -> {
-                            val content = zipInputStream.readBytes()
-                            metadata = JSONObject(String(content))
-                        }
-                        entryName.matches(Regex(".*\\.(jpg|jpeg|png|gif|bmp|webp)", RegexOption.IGNORE_CASE)) -> {
-                            val imageData = zipInputStream.readBytes()
-                            images.add(entryName to imageData)
-                        }
-                    }
-
-                    zipInputStream.closeEntry()
-                    entry = zipInputStream.nextEntry
-                }
-            }
-        }
-
-        if (images.isEmpty()) {
-            throw Exception("No images found in CBZ file")
-        }
-
-        // Sort images by name (natural order)
-        images.sortBy { it.first.lowercase() }
-
-        // Extract metadata
-        val title = metadata?.optString("title") ?: fileName.replace(".cbz", "")
-
-        statusText.post { statusText.text = getString(R.string.creating_pdf_with_pages, images.size) }
-
-        val (pdfStream, displayPath) = getOutputStreamForPdf(title)
-
-        PdfWriter(pdfStream).use { writer ->
-            PdfDocument(writer).use { pdfDoc ->
-                // Set PDF metadata
-                val info = pdfDoc.documentInfo
-                info.title = title
-                metadata?.optString("author")?.let { if (it.isNotEmpty()) info.author = it }
-                metadata?.optString("publisher")?.let { if (it.isNotEmpty()) info.subject = it }
-
-                Document(pdfDoc).use { document ->
-                    document.setMargins(0f, 0f, 0f, 0f)
-
-                    // Add all images as pages
-                    images.forEachIndexed { index, (_, imageData) ->
-                        val progress = ((index + 1) * 100 / images.size)
-                        progressBar.post {
-                            progressBar.progress = progress
-                        }
-                        statusText.post {
-                            statusText.text =
-                                getString(R.string.adding_page_of, index + 1, images.size)
-                        }
-
-                        val bitmap = BitmapFactory.decodeByteArray(imageData, 0, imageData.size)
-                        val outputStream = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
-                        val compressedImageData = outputStream.toByteArray()
-
-                        val imageData = ImageDataFactory.create(compressedImageData)
-                        val image = Image(imageData)
-
-                        // Scale image to fit page
-                        val pageWidth = 595f // A4 width in points
-                        val pageHeight = 842f // A4 height in points
-
-                        val scale = minOf(
-                            pageWidth / bitmap.width,
-                            pageHeight / bitmap.height
-                        )
-
-                        image.scaleToFit(bitmap.width * scale, bitmap.height * scale)
-                        image.setFixedPosition(
-                            (pageWidth - bitmap.width * scale) / 2,
-                            (pageHeight - bitmap.height * scale) / 2
-                        )
-
-                        if (index > 0) {
-                            document.add(AreaBreak())
-                        }
-
-                        document.add(image)
-                        bitmap.recycle()
-                    }
-                }
-            }
-        }
-
-        "PDF saved to: $displayPath"
-    }
-
-    private fun getFileName(uri: Uri): String {
-        var result = "comic.cbz"
-        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (nameIndex != -1) {
-                    result = cursor.getString(nameIndex)
-                }
-            }
-        }
-        return result
-    }
-
-    private fun openFolderPicker() {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
-        folderPickerLauncher.launch(intent)
-    }
-
-    private fun convertFolderToPdf(uri: Uri) {
-        CoroutineScope(Dispatchers.Main).launch {
-            try {
-                selectFileButton.isEnabled = false
-                selectFolderButton.isEnabled = false
-                progressBar.progress = 0
-                progressBar.visibility = View.VISIBLE
-                statusText.text = getString(R.string.reading_folder_contents)
-
-                val result = withContext(Dispatchers.IO) {
-                    processFolderContents(uri)
-                }
-
-                progressBar.visibility = View.GONE
-                statusText.text = getString(R.string.all_chapters_converted_successfully, result)
-                Toast.makeText(this@MainActivity, "Folder conversion complete!", Toast.LENGTH_LONG).show()
-
-            } catch (e: Exception) {
-                progressBar.visibility = View.GONE
-                statusText.text = getString(R.string.error, e.message)
-                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                e.printStackTrace()
-            } finally {
-                selectFileButton.isEnabled = true
-                selectFolderButton.isEnabled = true
-            }
-        }
-    }
-
-    private suspend fun processFolderContents(uri: Uri): String = withContext(Dispatchers.IO) {
-        statusText.post { statusText.text = getString(R.string.scanning_folder) }
-
-        // Take persistent permission
-        contentResolver.takePersistableUriPermission(
-            uri,
-            Intent.FLAG_GRANT_READ_URI_PERMISSION
-        )
-
-        // Get folder name
-        val folderName = getFolderName(uri)
-
-        // Find all CBZ files, metadata, and cover image
-        val documentFile = DocumentFile.fromTreeUri(this@MainActivity, uri)
-            ?: throw Exception("Cannot access folder")
-
-        var metadata: JSONObject? = null
-        var coverImageData: ByteArray? = null
-        val cbzFiles = mutableListOf<DocumentFile>()
-
-        documentFile.listFiles().forEach { file ->
-            when {
-                file.name?.equals("index.json", ignoreCase = true) == true -> {
-                    contentResolver.openInputStream(file.uri)?.use { inputStream ->
-                        val content = inputStream.readBytes()
-                        metadata = JSONObject(String(content))
-                    }
-                }
-                file.name?.matches(Regex("cover\\.(jpg|jpeg|png|gif|bmp|webp)", RegexOption.IGNORE_CASE)) == true -> {
-                    contentResolver.openInputStream(file.uri)?.use { inputStream ->
-                        coverImageData = inputStream.readBytes()
-                    }
-                }
-                file.name?.endsWith(".cbz", ignoreCase = true) == true -> {
-                    cbzFiles.add(file)
-                }
-            }
-        }
-
-        if (cbzFiles.isEmpty()) {
-            throw Exception("No CBZ files found in folder")
-        }
-
-        // Sort CBZ files by name
-        cbzFiles.sortBy { it.name?.lowercase() }
-
-        statusText.post {
-            statusText.text = getString(R.string.found_chapters_processing, cbzFiles.size)
-        }
-
-        // Process each CBZ file
-        cbzFiles.forEachIndexed { index, cbzFile ->
-            val progress = ((index + 1) * 100 / cbzFiles.size)
-            progressBar.post {
-                progressBar.progress = progress
-            }
-            statusText.post {
-                statusText.text = getString(
-                    R.string.processing_chapter_of,
-                    index + 1,
-                    cbzFiles.size,
-                    cbzFile.name
-                )
-            }
-
-            processChapterCbz(cbzFile, folderName, metadata, coverImageData)
-        }
-
-        "Saved ${cbzFiles.size} chapters to: ${AppSettings.getDisplayPath(this@MainActivity)}"
-    }
-
-    private fun getFolderName(uri: Uri): String {
-        val documentFile = DocumentFile.fromTreeUri(this, uri)
-        return documentFile?.name ?: "Comic"
-    }
-
-    private fun getOutputStreamForPdf(title: String, subfolder: String? = null): Pair<OutputStream, String> {
-        val outputUri = AppSettings.getOutputFolderUri(this)
-        return if (outputUri != null) {
-            val root = DocumentFile.fromTreeUri(this, outputUri)
-                ?: throw Exception(getString(R.string.output_folder_inaccessible))
-            val dir = if (subfolder != null) {
-                root.findFile(subfolder) ?: root.createDirectory(subfolder)
-                    ?: throw Exception(getString(R.string.output_folder_inaccessible))
-            } else root
-            dir.findFile("$title.pdf")?.delete()
-            val docFile = dir.createFile("application/pdf", "$title.pdf")
-                ?: throw Exception(getString(R.string.output_folder_inaccessible))
-            val stream = contentResolver.openOutputStream(docFile.uri)
-                ?: throw Exception(getString(R.string.output_folder_inaccessible))
-            val rootName = root.name ?: outputUri.lastPathSegment ?: ""
-            val displayPath = if (subfolder != null) "$rootName/$subfolder/$title.pdf" else "$rootName/$title.pdf"
-            stream to displayPath
-        } else {
-            val base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val dir = if (subfolder != null) File(base, "ComicConverter/$subfolder") else File(base, "ComicConverter")
-            if (!dir.exists()) dir.mkdirs()
-            val pdfFile = File(dir, "$title.pdf")
-            FileOutputStream(pdfFile) to pdfFile.absolutePath
-        }
-    }
-
-    private suspend fun processChapterCbz(
-        cbzFile: DocumentFile,
-        subfolder: String?,
-        comicMetadata: JSONObject?,
-        coverImageData: ByteArray?
-    ) = withContext(Dispatchers.IO) {
-        val fileName = cbzFile.name ?: "chapter.cbz"
-        val images = mutableListOf<Pair<String, ByteArray>>()
-        var chapterMetadata: JSONObject? = null
-
-        // Extract CBZ contents
-        contentResolver.openInputStream(cbzFile.uri)?.use { inputStream ->
-            ZipInputStream(inputStream).use { zipInputStream ->
-                var entry = zipInputStream.nextEntry
-
-                while (entry != null) {
-                    val entryName = entry.name
-
-                    when {
-                        entryName.equals("index.json", ignoreCase = true) -> {
-                            val content = zipInputStream.readBytes()
-                            chapterMetadata = JSONObject(String(content))
-                        }
-                        entryName.matches(Regex(".*\\.(jpg|jpeg|png|gif|bmp|webp)", RegexOption.IGNORE_CASE)) -> {
-                            val imageData = zipInputStream.readBytes()
-                            images.add(entryName to imageData)
-                        }
-                    }
-
-                    zipInputStream.closeEntry()
-                    entry = zipInputStream.nextEntry
-                }
-            }
-        }
-
-        if (images.isEmpty()) {
-            throw Exception("No images found in $fileName")
-        }
-
-        // Sort images by name
-        images.sortBy { it.first.lowercase() }
-
-        // Extract chapter title from metadata or filename
-        val chapterTitle = chapterMetadata?.optString("title")
-            ?: fileName.replace(".cbz", "")
-
-        // Create PDF
-        val (pdfStream, _) = getOutputStreamForPdf(chapterTitle, subfolder)
-
-        PdfWriter(pdfStream).use { writer ->
-            PdfDocument(writer).use { pdfDoc ->
-                // Set PDF metadata
-                val info = pdfDoc.documentInfo
-                info.title = chapterTitle
-
-                // Use chapter metadata first, fall back to comic metadata
-                val author = chapterMetadata?.optString("author")?.takeIf { it.isNotEmpty() }
-                    ?: comicMetadata?.optString("author")?.takeIf { it.isNotEmpty() }
-                author?.let { info.author = it }
-
-                val publisher = chapterMetadata?.optString("publisher")?.takeIf { it.isNotEmpty() }
-                    ?: comicMetadata?.optString("publisher")?.takeIf { it.isNotEmpty() }
-                publisher?.let { info.subject = it }
-
-                Document(pdfDoc).use { document ->
-                    document.setMargins(0f, 0f, 0f, 0f)
-
-                    var pageIndex = 0
-
-                    // Add cover image as first page if available
-                    coverImageData?.let { coverData ->
-                        val bitmap = BitmapFactory.decodeByteArray(coverData, 0, coverData.size)
-                        val outputStream = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
-                        val compressedImageData = outputStream.toByteArray()
-
-                        val imageData = ImageDataFactory.create(compressedImageData)
-                        val image = Image(imageData)
-
-                        // Scale image to fit page
-                        val pageWidth = 595f // A4 width in points
-                        val pageHeight = 842f // A4 height in points
-
-                        val scale = minOf(
-                            pageWidth / bitmap.width,
-                            pageHeight / bitmap.height
-                        )
-
-                        image.scaleToFit(bitmap.width * scale, bitmap.height * scale)
-                        image.setFixedPosition(
-                            (pageWidth - bitmap.width * scale) / 2,
-                            (pageHeight - bitmap.height * scale) / 2
-                        )
-
-                        document.add(image)
-                        bitmap.recycle()
-                        pageIndex++
-                    }
-
-                    // Add all chapter images as pages
-                    images.forEach { (_, imageData) ->
-                        val bitmap = BitmapFactory.decodeByteArray(imageData, 0, imageData.size)
-                        val outputStream = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
-                        val compressedImageData = outputStream.toByteArray()
-
-                        val imageData = ImageDataFactory.create(compressedImageData)
-                        val image = Image(imageData)
-
-                        // Scale image to fit page
-                        val pageWidth = 595f // A4 width in points
-                        val pageHeight = 842f // A4 height in points
-
-                        val scale = minOf(
-                            pageWidth / bitmap.width,
-                            pageHeight / bitmap.height
-                        )
-
-                        image.scaleToFit(bitmap.width * scale, bitmap.height * scale)
-                        image.setFixedPosition(
-                            (pageWidth - bitmap.width * scale) / 2,
-                            (pageHeight - bitmap.height * scale) / 2
-                        )
-
-                        if (pageIndex > 0) {
-                            document.add(AreaBreak())
-                        }
-
-                        document.add(image)
-                        bitmap.recycle()
-                        pageIndex++
-                    }
-                }
-            }
-        }
     }
 }
